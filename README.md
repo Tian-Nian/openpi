@@ -52,7 +52,7 @@ dataset = LeRobotDataset.create(
     image_writer_processes=5,
 )
 ```
-2. 将你的数据填到注册的dataset下
+2. 将你的数据填到注册的`dataset`下
 ``` python
 # 读入你存储的数据, 按照每一帧进行读取, 例如你的数据有50帧, 那么num_frame = 50
 for i in range(num_frames):
@@ -86,7 +86,7 @@ dataset.consolidate()
 export LEROBOT_HOME="your path"
 ```
 
-### step2. 设置config.py:
+### step2. 设置`config.py`:
 我已经将我的config.py替换进去了, 这里拿出一个讲解下详细配置.
 ``` python
 TrainConfig(
@@ -141,7 +141,7 @@ XLA_PYTHON_CLIENT_MEM_FRACTION=0.9 uv run scripts/train.py "your config name" --
 ```
 
 ### step4. 开启本地推理
-为大家提供了一个简洁的模版, 当然还有一个我封装过的pi_model.py, 可以魔改一下.
+为大家提供了一个简洁的模版, 当然还有一个我封装过的`pi_model.py`, 可以魔改一下.
 ``` python
 from openpi.models import model as _model
 from openpi.policies import droid_policy
