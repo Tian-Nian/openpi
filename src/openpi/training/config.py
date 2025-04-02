@@ -382,15 +382,89 @@ class TrainConfig:
 
 # Use `get_config` if you need to get a config by name in your code.
 _CONFIGS = [
-    ###
-    ### finetune config
-    ###
+    #======= single arm ========#
+    TrainConfig(
+        name="pi0_single_base_aloha_lora",
+        model=pi0.Pi0Config(paligemma_variant="gemma_2b_lora", action_expert_variant="gemma_300m_lora"),
+        data=LeRobotLiberoDataConfig(
+            repo_id="your_repo_id",# your datasets repo_id
+            base_config=DataConfig(
+                local_files_only=True,  # Set to True for local-only datasets.
+                prompt_from_task=True,  # Set to True for prompt by task_name
+            ),
+        ),
+        freeze_filter=pi0.Pi0Config(
+            action_dim=14,paligemma_variant="gemma_2b_lora", action_expert_variant="gemma_300m_lora"
+        ).get_freeze_filter(),
+        batch_size=32, # the total batch_size not pre_gpu batch_size
+        weight_loader=weight_loaders.CheckpointWeightLoader("s3://openpi-assets/checkpoints/pi0_base/params"),
+        num_train_steps=30000,
+        fsdp_devices=1, # refer line 359
+    ),
+    # pi0_fast_base by lora
+    TrainConfig(
+        name="pi0_fingle_fast_aloha_lora",
+        model=pi0_fast.Pi0FASTConfig(paligemma_variant="gemma_2b_lora"),
+        data=LeRobotLiberoDataConfig(
+            repo_id="your_repo_id",# your datasets repo_id
+            base_config=DataConfig(
+                local_files_only=True,  # Set to True for local-only datasets.
+                prompt_from_task=True,  # Set to True for prompt by task_name
+            ),
+        ),
+        freeze_filter=pi0_fast.Pi0FASTConfig(
+            action_dim=14, action_horizon=10, max_token_len=300, paligemma_variant="gemma_2b_lora"
+        ).get_freeze_filter(),
+        batch_size=32,
+        weight_loader=weight_loaders.CheckpointWeightLoader("s3://openpi-assets/checkpoints/pi0_fast_base/params"),
+        num_train_steps=30000,
+        fsdp_devices=2, # refer line 359
+    ),
+    # pi0_base by full
+    TrainConfig(
+        name="pi0_single_base_aloha_full",
+        model=pi0.Pi0Config(),
+        data=LeRobotLiberoDataConfig(
+            repo_id="your_repo_id",# your datasets repo_id
+            base_config=DataConfig(
+                local_files_only=True,  # Set to True for local-only datasets.
+                prompt_from_task=True,  # Set to True for prompt by task_name
+            ),
+        ),
+        freeze_filter=pi0.Pi0Config(
+            action_dim=14,paligemma_variant="gemma_2b_lora", action_expert_variant="gemma_300m_lora"
+        ).get_freeze_filter(),
+        batch_size=32, # the total batch_size not pre_gpu batch_size
+        weight_loader=weight_loaders.CheckpointWeightLoader("s3://openpi-assets/checkpoints/pi0_base/params"),
+        num_train_steps=30000,
+        fsdp_devices=4, # refer line 359
+    ),
+    # pi0_fast_base by full
+    TrainConfig(
+        name="pi0_single_fast_aloha_full",
+        model=pi0_fast.Pi0FASTConfig(),
+        data=LeRobotLiberoDataConfig(
+            repo_id="your_repo_id",# your datasets repo_id
+            base_config=DataConfig(
+                local_files_only=True,  # Set to True for local-only datasets.
+                prompt_from_task=True,  # Set to True for prompt by task_name
+            ),
+        ),
+        freeze_filter=pi0_fast.Pi0FASTConfig(
+            action_dim=14, action_horizon=10, max_token_len=300
+        ).get_freeze_filter(),
+        batch_size=32,
+        weight_loader=weight_loaders.CheckpointWeightLoader("s3://openpi-assets/checkpoints/pi0_fast_base/params"),
+        num_train_steps=30000,
+        fsdp_devices=4, # refer line 359
+    ),
+    #======= dual arm ========#
     # pi0_base by lora
     TrainConfig(
-        name="pi0_base_aloha_lora",
+        name="pi0_dual_base_aloha_lora",
         model=pi0.Pi0Config(paligemma_variant="gemma_2b_lora", action_expert_variant="gemma_300m_lora"),
         data=LeRobotAlohaDataConfig(
-            repo_id="your repo id",# your datasets repo_id
+            repo_id="dual_arm_pick_snack_on_belt",# your datasets repo_id
             repack_transforms=_transforms.Group(
                 inputs=[
                     _transforms.RepackTransform(
@@ -413,7 +487,7 @@ _CONFIGS = [
             ),
         ),
         freeze_filter=pi0.Pi0Config(
-            action_dim=16,paligemma_variant="gemma_2b_lora", action_expert_variant="gemma_300m_lora"
+            action_dim=14,paligemma_variant="gemma_2b_lora", action_expert_variant="gemma_300m_lora"
         ).get_freeze_filter(),
         batch_size=32, # the total batch_size not pre_gpu batch_size
         weight_loader=weight_loaders.CheckpointWeightLoader("s3://openpi-assets/checkpoints/pi0_base/params"),
@@ -422,10 +496,10 @@ _CONFIGS = [
     ),
     # pi0_fast_base by lora
     TrainConfig(
-        name="pi0_fast_aloha_lora",
+        name="pi0_dual_fast_aloha_lora",
         model=pi0_fast.Pi0FASTConfig(paligemma_variant="gemma_2b_lora"),
         data=LeRobotAlohaDataConfig(
-            repo_id="your repo id",# your datasets repo_id
+            repo_id="dhb_mt1_rt0_1000",# your datasets repo_id
             # default_prompt="uncap the pen",
             repack_transforms=_transforms.Group(
                 inputs=[
@@ -449,7 +523,7 @@ _CONFIGS = [
             ),
         ),
         freeze_filter=pi0_fast.Pi0FASTConfig(
-            action_dim=16, action_horizon=10, max_token_len=300, paligemma_variant="gemma_2b_lora"
+            action_dim=14, action_horizon=10, max_token_len=300, paligemma_variant="gemma_2b_lora"
         ).get_freeze_filter(),
         batch_size=32,
         weight_loader=weight_loaders.CheckpointWeightLoader("s3://openpi-assets/checkpoints/pi0_fast_base/params"),
@@ -458,10 +532,10 @@ _CONFIGS = [
     ),
     # pi0_base by full
     TrainConfig(
-        name="pi0_base_aloha_full",
+        name="pi0_dual_base_aloha_full",
         model=pi0.Pi0Config(),
         data=LeRobotAlohaDataConfig(
-            repo_id="your repo id",# your datasets repo_id
+            repo_id="bsh_mt1_rt0_100",# your datasets repo_id
             repack_transforms=_transforms.Group(
                 inputs=[
                     _transforms.RepackTransform(
@@ -484,7 +558,7 @@ _CONFIGS = [
             ),
         ),
         freeze_filter=pi0.Pi0Config(
-            action_dim=16,paligemma_variant="gemma_2b_lora", action_expert_variant="gemma_300m_lora"
+            action_dim=14,paligemma_variant="gemma_2b_lora", action_expert_variant="gemma_300m_lora"
         ).get_freeze_filter(),
         batch_size=32, # the total batch_size not pre_gpu batch_size
         weight_loader=weight_loaders.CheckpointWeightLoader("s3://openpi-assets/checkpoints/pi0_base/params"),
@@ -493,10 +567,10 @@ _CONFIGS = [
     ),
     # pi0_fast_base by full
     TrainConfig(
-        name="pi0_fast_aloha_full",
+        name="pi0_dual_fast_aloha_full",
         model=pi0_fast.Pi0FASTConfig(),
         data=LeRobotAlohaDataConfig(
-            repo_id="your repo id",# your datasets repo_id
+            repo_id="bsh_mt1_rt0_100",# your datasets repo_id
             repack_transforms=_transforms.Group(
                 inputs=[
                     _transforms.RepackTransform(
@@ -519,7 +593,7 @@ _CONFIGS = [
             ),
         ),
         freeze_filter=pi0_fast.Pi0FASTConfig(
-            action_dim=16, action_horizon=10, max_token_len=300
+            action_dim=14, action_horizon=10, max_token_len=300
         ).get_freeze_filter(),
         batch_size=32,
         weight_loader=weight_loaders.CheckpointWeightLoader("s3://openpi-assets/checkpoints/pi0_fast_base/params"),

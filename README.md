@@ -87,7 +87,8 @@ export LEROBOT_HOME="your path"
 ```
 
 ### step2. 设置`config.py`:
-我已经将我的config.py替换进去了, 这里拿出一个讲解下详细配置.
+我已经将我的config.py替换进去了, 提供了单臂与双臂两种类型, 单臂基于libero_policy,但是action和state是对齐维度(关节角控制),双臂采用aloha_policy, 取消了adapt_to_pi的设置.
+这里拿出一个讲解下详细配置.
 ``` python
 TrainConfig(
     name="pi0_base_aloha_lora", # 你的config_name, 后面训练会用到, 可以随意设置
