@@ -10,6 +10,9 @@ import openpi.models.gemma as _gemma
 from openpi.models_pytorch.gemma_pytorch import PaliGemmaWithExpertModel
 import openpi.models_pytorch.preprocessing_pytorch as _preprocessing
 
+from openpi.rtc.modeling_rtc import RTCProcessor
+from openpi.rtc.configuration_rtc import RTCConfig
+
 
 def get_safe_dtype(target_dtype, device_type):
     """Get a safe dtype for the given device type."""
@@ -86,6 +89,7 @@ class PI0Pytorch(nn.Module):
         super().__init__()
         self.config = config
         self.pi05 = config.pi05
+        self.rtc_processor = RTCProcessor(RTCConfig())
 
         paligemma_config = _gemma.get_config(config.paligemma_variant)
         action_expert_config = _gemma.get_config(config.action_expert_variant)
@@ -373,7 +377,7 @@ class PI0Pytorch(nn.Module):
         return F.mse_loss(u_t, v_t, reduction="none")
 
     @torch.no_grad()
-    def sample_actions(self, device, observation, noise=None, num_steps=10) -> Tensor:
+    def sample_actions(self, device, observation, noise=None, num_steps=10, **kwargs) -> Tensor:
         """Do a full inference forward and compute the action (batch_size x num_steps x num_motors)"""
         bsize = observation.state.shape[0]
         if noise is None:
@@ -403,15 +407,41 @@ class PI0Pytorch(nn.Module):
 
         x_t = noise
         time = torch.tensor(1.0, dtype=torch.float32, device=device)
+
         while time >= -dt / 2:
             expanded_time = time.expand(bsize)
-            v_t = self.denoise_step(
-                state,
-                prefix_pad_masks,
-                past_key_values,
-                x_t,
-                expanded_time,
-            )
+            
+            def denoise_step_partial_call(input_x_t, current_timestep=expanded_time):
+                return self.denoise_step(
+                        state=state,
+                        prefix_pad_masks=prefix_pad_masks,
+                        past_key_values=past_key_values,
+                        x_t=input_x_t,
+                        timestep=current_timestep,
+                    )
+
+            if self.rtc_processor and kwargs.get("inference_delay") is not None:
+                inference_delay = kwargs.get("inference_delay")
+                prev_chunk_left_over = kwargs.get("prev_chunk_left_over")
+                execution_horizon = kwargs.get("execution_horizon")
+                
+                v_t = self.rtc_processor.denoise_step(
+                    x_t=x_t,
+                    prev_chunk_left_over=prev_chunk_left_over,
+                    inference_delay=inference_delay,
+                    time=time,
+                    original_denoise_step_partial=denoise_step_partial_call,
+                    execution_horizon=execution_horizon,
+                )
+
+            else:
+                v_t = self.denoise_step(
+                    state,
+                    prefix_pad_masks,
+                    past_key_values,
+                    x_t,
+                    expanded_time,
+                )
 
             # Euler step - use new tensor assignment instead of in-place operation
             x_t = x_t + dt * v_t

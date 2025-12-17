@@ -65,7 +65,7 @@ class Policy(BasePolicy):
             self._rng = rng or jax.random.key(0)
 
     @override
-    def infer(self, obs: dict, *, noise: np.ndarray | None = None) -> dict:  # type: ignore[misc]
+    def infer(self, obs: dict, *, noise: np.ndarray | None = None, **kwargs) -> dict:  # type: ignore[misc]
         # Make a copy since transformations may modify the inputs in place.
         inputs = jax.tree.map(lambda x: x, obs)
         inputs = self._input_transform(inputs)
@@ -91,7 +91,7 @@ class Policy(BasePolicy):
         start_time = time.monotonic()
         outputs = {
             "state": inputs["state"],
-            "actions": self._sample_actions(sample_rng_or_pytorch_device, observation, **sample_kwargs),
+            "actions": self._sample_actions(sample_rng_or_pytorch_device, observation, **sample_kwargs, **kwargs),
         }
         model_time = time.monotonic() - start_time
         if self._is_pytorch_model:
@@ -109,7 +109,6 @@ class Policy(BasePolicy):
     def metadata(self) -> dict[str, Any]:
         return self._metadata
 
-
 class PolicyRecorder(_base_policy.BasePolicy):
     """Records the policy's behavior to disk."""
 
@@ -122,8 +121,8 @@ class PolicyRecorder(_base_policy.BasePolicy):
         self._record_step = 0
 
     @override
-    def infer(self, obs: dict) -> dict:  # type: ignore[misc]
-        results = self._policy.infer(obs)
+    def infer(self, obs: dict, **kwargs) -> dict:  # type: ignore[misc]
+        results = self._policy.infer(obs, **kwargs)
 
         data = {"inputs": obs, "outputs": results}
         data = flax.traverse_util.flatten_dict(data, sep="/")

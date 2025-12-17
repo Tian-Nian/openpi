@@ -956,6 +956,39 @@ _CONFIGS = [
         exp_name="debug_pi05",
         wandb_enabled=False,
     ),
+    TrainConfig(
+        name="pi05_full_base",
+        model=pi0_config.Pi0Config(pi05=True),
+        data=LeRobotAlohaDataConfig(
+            repo_id="1118",
+            repack_transforms=_transforms.Group(
+                inputs=[
+                    _transforms.RepackTransform(
+                        {
+                            "images": {
+                                "cam_high": "observation.images.cam_high",
+                                "cam_left_wrist": "observation.images.cam_left_wrist",
+                                "cam_right_wrist": "observation.images.cam_right_wrist",
+                            },
+                            "state": "observation.state",
+                            "actions": "action",
+                            "prompt": "task",
+                        }
+                    )
+                ]
+            ),
+            base_config=DataConfig(
+                prompt_from_task=True,  # Set to True for prompt by task_name
+            ),
+        ),
+        weight_loader=weight_loaders.CheckpointWeightLoader("gs://openpi-assets/checkpoints/pi05_base/params"),
+        # weight_loader=weight_loaders.CheckpointWeightLoader("/mnt/pfs/scalelab/niantian/openpi/checkpoints/pi05_full_base/pi05_1004/10000/params"),
+        num_train_steps=100000,
+        save_interval = 1000,
+        keep_period = 10000,
+        batch_size=64,
+        fsdp_devices=2, # refer line 359
+    ),
     #
     # RoboArena configs.
     #
