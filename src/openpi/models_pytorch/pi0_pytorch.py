@@ -1,3 +1,4 @@
+import dataclasses
 import logging
 import math
 
@@ -79,6 +80,13 @@ def make_att_2d_masks(pad_masks, att_masks):
     att_2d_masks = cumsum[:, None, :] <= cumsum[:, :, None]
     pad_2d_masks = pad_masks[:, None, :] * pad_masks[:, :, None]
     return att_2d_masks & pad_2d_masks
+
+
+@dataclasses.dataclass(frozen=True)
+class PrefixFeatures:
+    tokens: Tensor
+    pad_masks: Tensor
+    att_masks: Tensor
 
 
 class PI0Pytorch(nn.Module):
@@ -313,6 +321,26 @@ class PI0Pytorch(nn.Module):
         att_masks = att_masks[None, :].expand(bsize, len(att_masks))
 
         return embs, pad_masks, att_masks, adarms_cond
+
+    def extract_prefix_features(self, observation, *, train: bool = False) -> PrefixFeatures:
+        """Runs only the observation-side prefix branch and returns its hidden states."""
+        images, img_masks, lang_tokens, lang_masks, _state = self._preprocess_observation(observation, train=train)
+
+        prefix_embs, prefix_pad_masks, prefix_att_masks = self.embed_prefix(images, img_masks, lang_tokens, lang_masks)
+        prefix_att_2d_masks = make_att_2d_masks(prefix_pad_masks, prefix_att_masks)
+        prefix_position_ids = torch.cumsum(prefix_pad_masks, dim=1) - 1
+        prefix_att_2d_masks_4d = self._prepare_attention_masks_4d(prefix_att_2d_masks)
+
+        outputs, _ = self.paligemma_with_expert.forward(
+            attention_mask=prefix_att_2d_masks_4d,
+            position_ids=prefix_position_ids,
+            past_key_values=None,
+            inputs_embeds=[prefix_embs, None],
+            use_cache=False,
+            adarms_cond=[None, None],
+        )
+        prefix_output, _ = outputs
+        return PrefixFeatures(tokens=prefix_output, pad_masks=prefix_pad_masks, att_masks=prefix_att_masks)
 
     def forward(self, observation, actions, noise=None, time=None) -> Tensor:
         """Do a full training forward pass and compute the loss (batch_size x num_steps x num_motors)"""

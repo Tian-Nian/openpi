@@ -113,6 +113,8 @@ class FakeDataset(Dataset):
                 return jax.random.uniform(data_rng, shape=shape, minval=-1.0, maxval=1.0)
             if spec.dtype == jnp.int32:
                 return jax.random.randint(data_rng, shape=shape, minval=0, maxval=2048)
+            if spec.dtype == jnp.bool_:
+                return jnp.ones(shape=shape, dtype=spec.dtype)
             return jnp.zeros(shape=shape, dtype=spec.dtype)
 
         observation = jax.tree.map(make_from_spec, self._observation_spec)

@@ -141,9 +141,10 @@ def preprocess_observation_pytorch(
             # Back to [-1, 1]
             image = image * 2.0 - 1.0
 
-        # Convert back to [B, C, H, W] format if it was originally channels-first
-        if is_channels_first:
-            image = image.permute(0, 3, 1, 2)  # [B, H, W, C] -> [B, C, H, W]
+        # The PyTorch vision tower always expects channels-first tensors.
+        if image.ndim != 4:
+            raise ValueError(f"Expected image tensor to have 4 dims, got shape {tuple(image.shape)}")
+        image = image.permute(0, 3, 1, 2)  # [B, H, W, C] -> [B, C, H, W]
 
         out_images[key] = image
 
