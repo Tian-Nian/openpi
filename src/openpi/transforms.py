@@ -253,16 +253,32 @@ class TokenizePrompt(DataTransformFn):
         if (prompt := data.pop("prompt", None)) is None:
             raise ValueError("Prompt is required")
 
+        is_batched_prompt = isinstance(prompt, (list, np.ndarray, jax.Array)) and not isinstance(prompt, str)
+
         if self.discrete_state_input:
             if (state := data.get("state", None)) is None:
                 raise ValueError("State is required.")
         else:
             state = None
 
-        if not isinstance(prompt, str):
-            prompt = prompt.item()
+        if is_batched_prompt:
+            prompts = list(prompt)
+            states = state if self.discrete_state_input else [None] * len(prompts)
+            token_list = []
+            mask_list = []
+            for prompt_item, state_item in zip(prompts, states, strict=True):
+                if not isinstance(prompt_item, str):
+                    prompt_item = prompt_item.item()
+                tokens, token_masks = self.tokenizer.tokenize(prompt_item, state_item)
+                token_list.append(tokens)
+                mask_list.append(token_masks)
+            tokens = np.stack(token_list)
+            token_masks = np.stack(mask_list)
+        else:
+            if not isinstance(prompt, str):
+                prompt = prompt.item()
+            tokens, token_masks = self.tokenizer.tokenize(prompt, state)
 
-        tokens, token_masks = self.tokenizer.tokenize(prompt, state)
         return {**data, "tokenized_prompt": tokens, "tokenized_prompt_mask": token_masks}
 
 

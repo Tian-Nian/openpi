@@ -69,13 +69,28 @@ class Policy(BasePolicy):
         # Make a copy since transformations may modify the inputs in place.
         inputs = jax.tree.map(lambda x: x, obs)
         inputs = self._input_transform(inputs)
+
+        is_batched = False
+        if "state" in inputs:
+            is_batched = np.asarray(inputs["state"]).ndim > 1
+        elif "image" in inputs and inputs["image"]:
+            first_image = next(iter(inputs["image"].values()))
+            is_batched = np.asarray(first_image).ndim > 3
+
         if not self._is_pytorch_model:
-            # Make a batch and convert to jax.Array.
-            inputs = jax.tree.map(lambda x: jnp.asarray(x)[np.newaxis, ...], inputs)
+            if not is_batched:
+                inputs = jax.tree.map(lambda x: jnp.asarray(x)[np.newaxis, ...], inputs)
+            else:
+                inputs = jax.tree.map(jnp.asarray, inputs)
             self._rng, sample_rng_or_pytorch_device = jax.random.split(self._rng)
         else:
             # Convert inputs to PyTorch tensors and move to correct device
-            inputs = jax.tree.map(lambda x: torch.from_numpy(np.array(x)).to(self._pytorch_device)[None, ...], inputs)
+            if not is_batched:
+                inputs = jax.tree.map(
+                    lambda x: torch.from_numpy(np.array(x)).to(self._pytorch_device)[None, ...], inputs
+                )
+            else:
+                inputs = jax.tree.map(lambda x: torch.from_numpy(np.array(x)).to(self._pytorch_device), inputs)
             sample_rng_or_pytorch_device = self._pytorch_device
 
         # Prepare kwargs for sample_actions
@@ -83,8 +98,8 @@ class Policy(BasePolicy):
         if noise is not None:
             noise = torch.from_numpy(noise).to(self._pytorch_device) if self._is_pytorch_model else jnp.asarray(noise)
 
-            if noise.ndim == 2:  # If noise is (action_horizon, action_dim), add batch dimension
-                noise = noise[None, ...]  # Make it (1, action_horizon, action_dim)
+            if not is_batched and noise.ndim == 2:
+                noise = noise[None, ...]
             sample_kwargs["noise"] = noise
 
         observation = _model.Observation.from_dict(inputs)
@@ -95,9 +110,15 @@ class Policy(BasePolicy):
         }
         model_time = time.monotonic() - start_time
         if self._is_pytorch_model:
-            outputs = jax.tree.map(lambda x: np.asarray(x[0, ...].detach().cpu()), outputs)
+            if not is_batched:
+                outputs = jax.tree.map(lambda x: np.asarray(x[0, ...].detach().cpu()), outputs)
+            else:
+                outputs = jax.tree.map(lambda x: np.asarray(x.detach().cpu()), outputs)
         else:
-            outputs = jax.tree.map(lambda x: np.asarray(x[0, ...]), outputs)
+            if not is_batched:
+                outputs = jax.tree.map(lambda x: np.asarray(x[0, ...]), outputs)
+            else:
+                outputs = jax.tree.map(np.asarray, outputs)
 
         outputs = self._output_transform(outputs)
         outputs["policy_timing"] = {
